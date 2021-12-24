@@ -23,7 +23,7 @@ bitsToNum = foldl (\sum bit -> fromEnum bit + 2 * sum) 0
 
 
 consumePacket :: [Bool] -> [Bool]
-consumePacket bs = 
+consumePacket bs = bs
 
 readVersionSum :: [Bool] -> Int
 readVersionSum (v1:v2:v3:t1:t2:t3:otherBits) 
