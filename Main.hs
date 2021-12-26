@@ -3,7 +3,7 @@ import Text.Printf (printf)
 
 main :: IO ()
 main = do
-  fileContent <- readFile "Example2.txt"
+  fileContent <- readFile "Input.txt"
   
   let hex = head $ lines fileContent
       bits = lineToBoolList hex
@@ -53,6 +53,7 @@ parseLiteralBlocks (b:bs) = let (fourBits, others) = splitAt 4 bs
                                       in (fourBits ++ otherBits, rem1)
 
 parseOperatorPacket :: Version -> Int -> Parser Packet
+parseOperatorPacket version operatorType [] = (ErrorPacket "No bits left", []) 
 parseOperatorPacket version operatorType (b:bs) = 
   case b of 
     False -> parseOperatorPacketWithNumBits version operatorType bs
@@ -67,12 +68,11 @@ parseOperatorPacketWithNumBits version operatorType bits
 
 parsePacketsWithNumBits :: Int -> Parser [Packet]
 parsePacketsWithNumBits x bits = 
-  let bitLength = length bits
-  in if bitLength == 0
-     then ([], bits)
-     else let (packet, rem1) = parsePacket bits
-              (packets, rem2) = parsePacketsWithNumBits (bitLength - length rem1) rem1
-              in (packet:packets, rem2)
+  if x == 0
+  then ([], bits)
+  else let (packet, rem1) = parsePacket bits
+           (packets, rem2) = parsePacketsWithNumBits (x - (length bits - length rem1)) rem1
+           in (packet:packets, rem2)
 
 parseOperatorPacketWithNumPackets :: Version -> OperatorType -> Parser Packet
 parseOperatorPacketWithNumPackets version operatorType bits 
