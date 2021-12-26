@@ -21,29 +21,55 @@ binToBool = (== '1')
 bitsToNum :: [Bool] -> Int
 bitsToNum = foldl (\sum bit -> fromEnum bit + 2 * sum) 0
 
+parsePacket :: Parser Packet
+parsePacket bits 
+  = let (version, rem1) = parseVersion bits
+        (packetTypeNumber, rem2) = parseBitsToNum 3 rem1
+    in case packetTypeNumber of
+      4 -> parseLiteralPacket version rem2 
+      _ -> parseOperatorPacket version packetTypeNumber rem2
 
-consumePacket :: [Bool] -> [Bool]
-consumePacket bs = bs
+parseLiteralPacket :: Version -> Parser Packet
+parseLiteralPacket version bits = let (num, rem1) = parseLiteralNumber bits
+                                  in (LiteralPacket version num, rem1)
 
-readVersionSum :: [Bool] -> Int
-readVersionSum (v1:v2:v3:t1:t2:t3:otherBits) 
-  = let vs = getVersion [v1, v2, v3]
-        pt = getPacketType [t1, t2, t3]
-    in 0
+parseLiteralNumber :: Parser LiteralNumber
+parseLiteralNumber bits = let (content, rem1) = parseLiteralBlocks bits
+                           in (bitsToNum content, rem1)
 
-getVersion :: [Bool] -> Int
-getVersion = bitsToNum
+parseLiteralBlocks :: Parser Bits
+parseLiteralBlocks (b:bs) = let (fourBits, others) = splitAt 4 bs
+                            in case b of
+                              False -> (fourBits, others)
+                              True -> let (otherBits, rem1) = parseLiteralBlocks others
+                                      in (fourBits ++ otherBits, rem1)
 
-getPacketType :: [Bool] -> PackageType
-getPacketType ts = 
-  case bitsToNum ts of
-    4 -> LiteralType
-    _ -> OperatorType
+parseOperatorPacket :: Version -> Int -> Parser Packet
+parseOperatorPacket version operatorType bits = (OperatorPacket version operatorType [], bits) -- Continue here ######################
 
+parseVersion :: Parser Version
+parseVersion = parseBitsToNum 3
 
-data PackageType = LiteralType | OperatorType
+parseBitsToNum :: Int -> Parser Int
+parseBitsToNum bitsToParse bits = 
+  let (part1, part2) = splitAt bitsToParse bits
+  in (bitsToNum part1, part2)
+
+data Packet = LiteralPacket Version LiteralNumber 
+  | OperatorPacket Version OperatorType [Packet]
+
+type Version = Int
+type LiteralNumber = Int
+type OperatorType = Int
+type BitsParsed = Int
+type Bits = [Bool]
+type Parser a = Bits -> (a, Bits)
+
+data PacketType = LiteralType | OperatorType
 
 data LengthType = LengthType0 | LengthType1
+
+
 
 
 
