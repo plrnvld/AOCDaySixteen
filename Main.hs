@@ -3,17 +3,25 @@ import Text.Printf (printf)
 
 main :: IO ()
 main = do
-  fileContent <- readFile "Input.txt"
-  let bools = lineToBoolList $ head $ lines fileContent
-  putStrLn $ (++ " bits read") $ show $ length bools
-  putStrLn $ show $ bitsToNum [True, True, False]
-  putStrLn "The end"
+  fileContent <- readFile "Example2.txt"
+  
+  let hex = head $ lines fileContent
+      bits = lineToBoolList hex
+      otherBits = "1101000101001010010001001000000000"
+      example3 = map binToBool otherBits
+      res = parsePacketsWithNumBits 27 example3
+  putStrLn $ "Example 3: " ++ show res
+  putStrLn ""
+  putStrLn $ "Bits: " ++ show (map (\c -> if c then '1' else '0') bits)
+  putStrLn $ (++ " bits read") $ show $ length bits
+  putStrLn $ show $ parsePacket bits
+
 
 lineToBoolList :: String -> [Bool]
-lineToBoolList = map (binToBool.hexToBin)
+lineToBoolList hex = map binToBool $ concat $ map hexToBin hex
 
-hexToBin :: Char -> Char
-hexToBin c = case readHex [c] of (x,_):_ -> head $ printf "%04b" (x::Int)
+hexToBin :: Char -> String
+hexToBin c = case readHex [c] of (x,_):_ -> printf "%04b" (x::Int)
       
 binToBool :: Char -> Bool
 binToBool = (== '1')
@@ -28,7 +36,7 @@ parsePacket bits
     in case packetTypeNumber of
       4 -> parseLiteralPacket version rem2 
       _ -> parseOperatorPacket version packetTypeNumber rem2
-
+      
 parseLiteralPacket :: Version -> Parser Packet
 parseLiteralPacket version bits = let (num, rem1) = parseLiteralNumber bits
                                   in (LiteralPacket version num, rem1)
@@ -45,7 +53,40 @@ parseLiteralBlocks (b:bs) = let (fourBits, others) = splitAt 4 bs
                                       in (fourBits ++ otherBits, rem1)
 
 parseOperatorPacket :: Version -> Int -> Parser Packet
-parseOperatorPacket version operatorType bits = (OperatorPacket version operatorType [], bits) -- Continue here ######################
+parseOperatorPacket version operatorType (b:bs) = 
+  case b of 
+    False -> parseOperatorPacketWithNumBits version operatorType bs
+    True -> parseOperatorPacketWithNumPackets version operatorType bs
+
+parseOperatorPacketWithNumBits :: Version -> OperatorType -> Parser Packet
+parseOperatorPacketWithNumBits version operatorType bits 
+  = let (firstFifteen, rem1) = splitAt 15 bits
+        numBits = bitsToNum firstFifteen
+        (subPackets, rem2) = parsePacketsWithNumBits numBits rem1
+    in (OperatorPacket version operatorType subPackets, rem2)
+
+parsePacketsWithNumBits :: Int -> Parser [Packet]
+parsePacketsWithNumBits x bits = 
+  let bitLength = length bits
+  in if bitLength == 0
+     then ([], bits)
+     else let (packet, rem1) = parsePacket bits
+              (packets, rem2) = parsePacketsWithNumBits (bitLength - length rem1) rem1
+              in (packet:packets, rem2)
+
+parseOperatorPacketWithNumPackets :: Version -> OperatorType -> Parser Packet
+parseOperatorPacketWithNumPackets version operatorType bits 
+  = let (firstEleven, rem1) = splitAt 11 bits
+        numPackets = bitsToNum firstEleven
+    in (OperatorPacket version operatorType [], rem1)
+
+parsePacketsWithNumPackets :: Int -> Parser [Packet]
+parsePacketsWithNumPackets num bits = 
+  if num == 0 
+  then ([], bits)
+  else let (packet, rem1) = parsePacket bits
+           (packets, rem2) = parsePacketsWithNumPackets (num - 1) rem1
+       in (packet:packets, rem2)
 
 parseVersion :: Parser Version
 parseVersion = parseBitsToNum 3
@@ -56,19 +97,19 @@ parseBitsToNum bitsToParse bits =
   in (bitsToNum part1, part2)
 
 data Packet = LiteralPacket Version LiteralNumber 
-  | OperatorPacket Version OperatorType [Packet]
+  | OperatorPacket Version OperatorType [Packet] 
+  | ErrorPacket String 
+  deriving Show
 
 type Version = Int
 type LiteralNumber = Int
 type OperatorType = Int
-type BitsParsed = Int
 type Bits = [Bool]
 type Parser a = Bits -> (a, Bits)
 
 data PacketType = LiteralType | OperatorType
 
 data LengthType = LengthType0 | LengthType1
-
 
 
 
