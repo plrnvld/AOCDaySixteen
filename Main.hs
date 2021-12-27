@@ -9,11 +9,12 @@ main = do
       bits = lineToBoolList hex
       parsed = fst $ parsePacket bits
       versionSum = sumVersions parsed
+      totalValue = getValue parsed
       
   putStrLn $ "Bits: " ++ show (map (\c -> if c then '1' else '0') bits)
   putStrLn $ (++ " bits read") $ show $ length bits
-  putStrLn $ show $ parsed
   putStrLn $ "Version sum: " ++ show versionSum
+  putStrLn $ "Value: " ++ show totalValue
 
 
 lineToBoolList :: String -> [Bool]
@@ -63,7 +64,7 @@ parseOperatorPacketWithNumBits version operatorType bits
   = let (firstFifteen, rem1) = splitAt 15 bits
         numBits = bitsToNum firstFifteen
         (subPackets, rem2) = parsePacketsWithNumBits numBits rem1
-    in (OperatorPacket version operatorType subPackets, rem2)
+    in (OperatorPacket version (getOperator operatorType) subPackets, rem2)
 
 parsePacketsWithNumBits :: Int -> Parser [Packet]
 parsePacketsWithNumBits x bits = 
@@ -77,7 +78,19 @@ parseOperatorPacketWithNumPackets :: Version -> OperatorType -> Parser Packet
 parseOperatorPacketWithNumPackets version operatorType bits 
   = let (firstEleven, rem1) = splitAt 11 bits
         numPackets = bitsToNum firstEleven
-    in (OperatorPacket version operatorType [], rem1)
+    in (OperatorPacket version (getOperator operatorType) [], rem1)
+
+getOperator :: Int -> [Int] -> Int
+getOperator 0 ns = sum ns
+getOperator 1 ns = product ns
+getOperator 2 ns = minimum ns
+getOperator 3 ns = maximum ns
+getOperator 5 [item1, item2] = if item1 > item2 then 1 else 0
+getOperator 6 [item1, item2] = if item1 < item2 then 1 else 0
+getOperator 7 [item1, item2] = if item1 == item2 then 1 else 0
+getOperator ot list = error $ "ot = " ++ show ot ++ " and list = " ++ show list
+
+
 
 parsePacketsWithNumPackets :: Int -> Parser [Packet]
 parsePacketsWithNumPackets num bits = 
@@ -101,16 +114,22 @@ sumVersions p = case p of
   LiteralPacket v n -> v
   OperatorPacket v o ps -> v + sum (map sumVersions ps)
 
+
+getValue :: Packet -> Int
+getValue p = case p of 
+  LiteralPacket v n -> n
+  OperatorPacket v o ps -> o $ map getValue ps
+
 data Packet = LiteralPacket Version LiteralNumber 
-  | OperatorPacket Version OperatorType [Packet] 
+  | OperatorPacket Version Operator [Packet] 
   | ErrorPacket String 
-  deriving Show
 
 type Version = Int
 type LiteralNumber = Int
 type OperatorType = Int
 type Bits = [Bool]
 type Parser a = Bits -> (a, Bits)
+type Operator = [Int] -> Int
 
 data PacketType = LiteralType | OperatorType
 
