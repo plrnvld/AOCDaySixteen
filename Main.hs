@@ -7,14 +7,13 @@ main = do
   
   let hex = head $ lines fileContent
       bits = lineToBoolList hex
-      otherBits = "1101000101001010010001001000000000"
-      example3 = map binToBool otherBits
-      res = parsePacketsWithNumBits 27 example3
-  putStrLn $ "Example 3: " ++ show res
-  putStrLn ""
+      parsed = fst $ parsePacket bits
+      versionSum = sumVersions parsed
+      
   putStrLn $ "Bits: " ++ show (map (\c -> if c then '1' else '0') bits)
   putStrLn $ (++ " bits read") $ show $ length bits
-  putStrLn $ show $ parsePacket bits
+  putStrLn $ show $ parsed
+  putStrLn $ "Version sum: " ++ show versionSum
 
 
 lineToBoolList :: String -> [Bool]
@@ -95,6 +94,12 @@ parseBitsToNum :: Int -> Parser Int
 parseBitsToNum bitsToParse bits = 
   let (part1, part2) = splitAt bitsToParse bits
   in (bitsToNum part1, part2)
+
+
+sumVersions :: Packet -> Int
+sumVersions p = case p of 
+  LiteralPacket v n -> v
+  OperatorPacket v o ps -> v + sum (map sumVersions ps)
 
 data Packet = LiteralPacket Version LiteralNumber 
   | OperatorPacket Version OperatorType [Packet] 
